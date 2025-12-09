@@ -10,6 +10,7 @@ const GameSessionSchema = new mongoose.Schema({
         progress: { type: Map, of: String, default: {} },
         score: { type: Number, default: 0 },
         finished: { type: Boolean, default: false },
+        finishedAt: { type: Date },
         lastPointsEarned: { type: Number, default: 0 },
         lastAnswerCorrect: { type: Boolean, default: false },
     }],

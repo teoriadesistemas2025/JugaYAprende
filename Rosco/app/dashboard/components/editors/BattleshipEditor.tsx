@@ -23,8 +23,9 @@ interface BattleshipEditorProps {
         title: string;
         ships: Ship[];
         pool: Question[];
+        timeLimit?: number;
     };
-    onSave: (data: { title: string, ships: Ship[], pool: Question[] }) => Promise<void>;
+    onSave: (data: { title: string, ships: Ship[], pool: Question[], timeLimit: number }) => Promise<void>;
     onCancel: () => void;
     saving: boolean;
 }
@@ -33,6 +34,8 @@ export default function BattleshipEditor({ initialData, onSave, onCancel, saving
     const [title, setTitle] = useState(initialData?.title || '');
     const [ships, setShips] = useState<Ship[]>(initialData?.ships || []);
     const [questions, setQuestions] = useState<Question[]>(initialData?.pool || []);
+
+    const [timeLimit, setTimeLimit] = useState(initialData?.timeLimit || 300); // Default 5 mins
 
     // Ship Placement State
     const [selectedShipSize, setSelectedShipSize] = useState(5);
@@ -48,7 +51,7 @@ export default function BattleshipEditor({ initialData, onSave, onCancel, saving
 
     const handleSave = () => {
         if (!title.trim() || ships.length < 1 || questions.length < 1) return;
-        onSave({ title, ships, pool: questions });
+        onSave({ title, ships, pool: questions, timeLimit });
     };
 
     const addQuestion = () => {
@@ -130,16 +133,36 @@ export default function BattleshipEditor({ initialData, onSave, onCancel, saving
                 </button>
             </div>
 
-            {/* Title Input */}
-            <div className="bg-card border border-white/10 rounded-xl p-6">
-                <label className="block text-sm font-medium text-gray-400 mb-2">Título del Juego</label>
-                <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-cyan-500 outline-none"
-                    placeholder="Ej: Batalla Naval de Historia"
-                />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Title Input */}
+                <div className="bg-card border border-white/10 rounded-xl p-6">
+                    <label className="block text-sm font-medium text-gray-400 mb-2">Título del Juego</label>
+                    <input
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-cyan-500 outline-none"
+                        placeholder="Ej: Batalla Naval de Historia"
+                    />
+                </div>
+
+                {/* Time Limit Input */}
+                <div className="bg-card border border-white/10 rounded-xl p-6">
+                    <label className="block text-sm font-medium text-gray-400 mb-2">Tiempo Límite (segundos)</label>
+                    <div className="flex gap-4 items-center">
+                        <input
+                            type="number"
+                            min="60"
+                            step="30"
+                            value={timeLimit}
+                            onChange={(e) => setTimeLimit(parseInt(e.target.value) || 300)}
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-cyan-500 outline-none"
+                        />
+                        <span className="text-gray-400 text-sm whitespace-nowrap">
+                            ({Math.floor(timeLimit / 60)} min {timeLimit % 60} s)
+                        </span>
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -318,6 +341,6 @@ export default function BattleshipEditor({ initialData, onSave, onCancel, saving
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

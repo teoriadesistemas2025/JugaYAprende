@@ -539,7 +539,7 @@ export default function CreateGamePage() {
                             const payload = {
                                 title: data.title,
                                 type: 'BATTLESHIP',
-                                questions: { ships: data.ships, pool: data.pool }
+                                questions: { ships: data.ships, pool: data.pool, timeLimit: data.timeLimit }
                             };
                             const res = await fetch('/api/roscos', {
                                 method: 'POST',

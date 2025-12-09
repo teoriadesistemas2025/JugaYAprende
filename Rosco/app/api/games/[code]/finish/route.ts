@@ -16,6 +16,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
         game.players[playerIndex].score = score;
         game.players[playerIndex].finished = true;
+        game.players[playerIndex].finishedAt = new Date();
 
         // Check if all players finished
         const allFinished = game.players.every((p: any) => p.finished);

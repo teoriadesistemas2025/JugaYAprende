@@ -306,7 +306,21 @@ export default function HostPage() {
                             </div>
 
                             <div className="space-y-4">
-                                {players.sort((a: any, b: any) => b.score - a.score).map((p: any, i: number) => (
+                                {players.sort((a: any, b: any) => {
+                                    // 1. Sort by Finished status (Finished first)
+                                    if (a.finished && !b.finished) return -1;
+                                    if (!a.finished && b.finished) return 1;
+
+                                    // 2. If both finished, sort by Time Taken (finishedAt)
+                                    if (a.finished && b.finished) {
+                                        const timeA = new Date(a.finishedAt).getTime();
+                                        const timeB = new Date(b.finishedAt).getTime();
+                                        return timeA - timeB;
+                                    }
+
+                                    // 3. If neither finished, sort by Score (desc)
+                                    return b.score - a.score;
+                                }).map((p: any, i: number) => (
                                     <div key={i} className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
                                         <div className="flex items-center gap-4">
                                             <div className={cn(
@@ -319,7 +333,19 @@ export default function HostPage() {
                                             </div>
                                             <div>
                                                 <span className="font-bold text-lg block">{p.name}</span>
-                                                {p.finished && <span className="text-xs text-green-400 font-bold">¡TERMINADO!</span>}
+                                                {p.finished ? (
+                                                    <span className="text-xs text-green-400 font-bold flex items-center gap-1">
+                                                        <Trophy className="w-3 h-3" />
+                                                        ¡TERMINADO!
+                                                        {p.finishedAt && gameData.startTime && (
+                                                            <span className="text-gray-400 ml-1">
+                                                                ({((new Date(p.finishedAt).getTime() - new Date(gameData.startTime).getTime()) / 1000).toFixed(1)}s)
+                                                            </span>
+                                                        )}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-gray-500">Jugando...</span>
+                                                )}
                                             </div>
                                         </div>
                                         <span className="font-mono font-bold text-2xl text-yellow-400">{p.score}</span>
