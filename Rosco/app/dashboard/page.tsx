@@ -160,17 +160,19 @@ export default function DashboardPage() {
                                     </h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {games.map((rosco) => (
-                                            <div key={rosco._id} className="bg-card rounded-2xl p-6 border border-white/10 hover:border-blue-500/50 transition-all group">
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-2xl ${rosco.type === 'BATTLESHIP' ? 'bg-blue-900/30' :
-                                                            rosco.type === 'TRIVIA' ? 'bg-yellow-900/30' :
-                                                                rosco.type === 'WORD_SEARCH' ? 'bg-green-900/30' :
-                                                                    rosco.type === 'MEMORY' ? 'bg-purple-900/30' :
-                                                                        rosco.type === 'HANGMAN' ? 'bg-pink-900/30' :
-                                                                            rosco.type === 'KAHOOT' ? 'bg-orange-900/30' :
-                                                                                'bg-gray-800'
+                                            <div key={rosco._id} className="bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10 transition-all group relative overflow-hidden">
+                                                <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110`} />
+
+                                                <div className="flex items-start justify-between mb-4 relative z-10">
+                                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-lg ${rosco.type === 'BATTLESHIP' ? 'bg-gradient-to-br from-blue-600 to-blue-800' :
+                                                        rosco.type === 'TRIVIA' ? 'bg-gradient-to-br from-yellow-500 to-orange-600' :
+                                                            rosco.type === 'WORD_SEARCH' ? 'bg-gradient-to-br from-green-500 to-emerald-700' :
+                                                                rosco.type === 'MEMORY' ? 'bg-gradient-to-br from-purple-500 to-indigo-700' :
+                                                                    rosco.type === 'HANGMAN' ? 'bg-gradient-to-br from-pink-500 to-rose-700' :
+                                                                        rosco.type === 'KAHOOT' ? 'bg-gradient-to-br from-orange-400 to-red-600' :
+                                                                            'bg-gray-800'
                                                         }`}>
-                                                        <span className="text-gray-400 grayscale">
+                                                        <span className="drop-shadow-md">
                                                             {rosco.type === 'BATTLESHIP' ? '🚢' :
                                                                 rosco.type === 'TRIVIA' ? '❓' :
                                                                     rosco.type === 'WORD_SEARCH' ? '🍲' :
@@ -179,34 +181,38 @@ export default function DashboardPage() {
                                                                                 rosco.type === 'KAHOOT' ? '🆚' : '🎲'}
                                                         </span>
                                                     </div>
-                                                    <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded">
+                                                    <span className="text-xs font-medium text-gray-400 bg-black/20 px-3 py-1 rounded-full border border-white/5">
                                                         {new Date(rosco.createdAt).toLocaleDateString()}
                                                     </span>
                                                 </div>
-                                                <h3 className="text-xl font-bold text-white mb-2">{rosco.title}</h3>
-                                                <p className="text-sm text-gray-400 mb-6">
-                                                    {getQuestionCount(rosco)} preguntas
-                                                </p>
 
-                                                <div className="flex gap-3">
-                                                    <button
-                                                        onClick={() => createGame(rosco._id)}
-                                                        className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                                                    >
-                                                        <Play className="w-4 h-4" /> Jugar
-                                                    </button>
-                                                    <Link
-                                                        href={`/dashboard/${rosco._id}/edit`}
-                                                        className="p-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </Link>
-                                                    <button
-                                                        onClick={() => handleDeleteClick(rosco._id)}
-                                                        className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                <div className="relative z-10">
+                                                    <h3 className="text-xl font-bold text-white mb-1 group-hover:text-blue-400 transition-colors line-clamp-1">{rosco.title}</h3>
+                                                    <p className="text-sm text-gray-400 mb-6 flex items-center gap-2">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-gray-600"></span>
+                                                        {getQuestionCount(rosco)} preguntas
+                                                    </p>
+
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => createGame(rosco._id)}
+                                                            className="flex-1 flex items-center justify-center gap-2 bg-white text-black hover:bg-blue-400 hover:text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-lg hover:shadow-blue-500/25 active:scale-95"
+                                                        >
+                                                            <Play className="w-4 h-4 fill-current" /> Jugar
+                                                        </button>
+                                                        <Link
+                                                            href={`/dashboard/${rosco._id}/edit`}
+                                                            className="p-2.5 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white rounded-xl transition-colors border border-white/5"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </Link>
+                                                        <button
+                                                            onClick={() => handleDeleteClick(rosco._id)}
+                                                            className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition-colors border border-red-500/10"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         ))}
