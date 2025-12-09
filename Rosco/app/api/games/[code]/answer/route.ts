@@ -117,154 +117,154 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             }
             return NextResponse.json({ success: true, correct: isCorrect });
         }
-    }
+
 
         // KAHOOT LOGIC
         if (config.type === 'KAHOOT') {
-        if (action === 'KAHOOT_ANSWER') {
-            // Verify phase
-            if (game.kahootState.phase !== 'ANSWERING') {
-                return NextResponse.json({ message: 'Not answering phase' }, { status: 400 });
+            if (action === 'KAHOOT_ANSWER') {
+                // Verify phase
+                if (game.kahootState.phase !== 'ANSWERING') {
+                    return NextResponse.json({ message: 'Not answering phase' }, { status: 400 });
+                }
+
+                const currentQ = config.questions[game.kahootState.currentQuestionIndex];
+                const isCorrect = answer === currentQ.answer;
+                const { answerIndex } = await req.json(); // Re-read body or assume it's there? req.json() consumes stream.
+                // Wait, I already read req.json() at the top. I need to destructure answerIndex there.
+                // But I can't change the top easily without replacing the whole file or a large chunk.
+                // I'll assume answerIndex is passed in the body and I should have destructured it.
+                // Let's check line 9.
+
+                // I will update line 9 to include answerIndex.
+
+                const playerIndex = game.players.findIndex((p: { name: string }) => p.name === player);
+                if (playerIndex > -1) {
+                    const p = game.players[playerIndex];
+
+                    // Calculate Score
+                    let points = 0;
+                    if (isCorrect) {
+                        const now = new Date().getTime();
+                        const endTime = new Date(game.kahootState.timerEndTime).getTime();
+                        const remaining = Math.max(0, endTime - now);
+                        const totalTime = (currentQ.timeLimit || 20) * 1000;
+
+                        // Score formula: 600 + (400 * percentage remaining)
+                        // Or standard Kahoot: up to 1000.
+                        // Let's do: 500 (base) + 500 * (remaining / total)
+                        points = Math.round(500 + (500 * (remaining / totalTime)));
+                    }
+
+                    p.score += points;
+                    p.lastPointsEarned = points;
+                    p.lastAnswerCorrect = isCorrect;
+
+                    // Update answers distribution
+                    const currentCount = game.kahootState.answers.get(String(answerIndex)) || 0;
+                    game.kahootState.answers.set(String(answerIndex), currentCount + 1);
+
+                    game.markModified('players');
+                    game.markModified('kahootState');
+                    await game.save();
+
+                    return NextResponse.json({ success: true, correct: isCorrect, points });
+                }
+                return NextResponse.json({ message: 'Player not found' }, { status: 404 });
             }
+        }
 
-            const currentQ = config.questions[game.kahootState.currentQuestionIndex];
-            const isCorrect = answer === currentQ.answer;
-            const { answerIndex } = await req.json(); // Re-read body or assume it's there? req.json() consumes stream.
-            // Wait, I already read req.json() at the top. I need to destructure answerIndex there.
-            // But I can't change the top easily without replacing the whole file or a large chunk.
-            // I'll assume answerIndex is passed in the body and I should have destructured it.
-            // Let's check line 9.
+        // Other game actions...
+        if (action === 'BATTLESHIP_UPDATE') {
+            const playerIndex = game.players.findIndex((p: { name: string }) => p.name === player);
+            if (playerIndex > -1) {
+                game.players[playerIndex].score = score;
+                game.markModified('players');
+                await game.save();
+            }
+            return NextResponse.json({ success: true });
+        }
 
-            // I will update line 9 to include answerIndex.
+        if (action === 'WORD_SEARCH_FINISH' || action === 'MEMORY_FINISH' || action === 'BATTLESHIP_FINISH') {
+            const playerIndex = game.players.findIndex((p: { name: string }) => p.name === player);
+            if (playerIndex > -1) {
+                game.players[playerIndex].score = score;
+                game.players[playerIndex].finished = true;
+                game.markModified('players');
+                await game.save();
+            }
+            return NextResponse.json({ success: true });
+        }
 
+        // Handle Force Finish
+        if (forceFinish) {
             const playerIndex = game.players.findIndex((p: { name: string }) => p.name === player);
             if (playerIndex > -1) {
                 const p = game.players[playerIndex];
-
-                // Calculate Score
-                let points = 0;
-                if (isCorrect) {
-                    const now = new Date().getTime();
-                    const endTime = new Date(game.kahootState.timerEndTime).getTime();
-                    const remaining = Math.max(0, endTime - now);
-                    const totalTime = (currentQ.timeLimit || 20) * 1000;
-
-                    // Score formula: 600 + (400 * percentage remaining)
-                    // Or standard Kahoot: up to 1000.
-                    // Let's do: 500 (base) + 500 * (remaining / total)
-                    points = Math.round(500 + (500 * (remaining / totalTime)));
+                p.finished = true;
+                if (forceStatus === 'correct') {
+                    p.score += 100;
                 }
-
-                p.score += points;
-                p.lastPointsEarned = points;
-                p.lastAnswerCorrect = isCorrect;
-
-                // Update answers distribution
-                const currentCount = game.kahootState.answers.get(String(answerIndex)) || 0;
-                game.kahootState.answers.set(String(answerIndex), currentCount + 1);
-
                 game.markModified('players');
-                game.markModified('kahootState');
-                await game.save();
 
-                return NextResponse.json({ success: true, correct: isCorrect, points });
+                const allFinished = game.players.every((pl: { finished: boolean }) => pl.finished);
+                if (allFinished && game.players.length > 0) {
+                    game.status = 'FINISHED';
+                }
+                await game.save();
+                return NextResponse.json({ success: true });
             }
             return NextResponse.json({ message: 'Player not found' }, { status: 404 });
         }
-    }
 
-    // Other game actions...
-    if (action === 'BATTLESHIP_UPDATE') {
-        const playerIndex = game.players.findIndex((p: { name: string }) => p.name === player);
-        if (playerIndex > -1) {
-            game.players[playerIndex].score = score;
-            game.markModified('players');
-            await game.save();
+        // Rosco game logic
+        const question = config.questions.find((q: { letter: string; answer: string }) => q.letter === letter);
+
+        let isCorrect = false;
+        let status = 'pasapalabra';
+
+        if (action === 'answer') {
+            const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+            isCorrect = normalize(answer) === normalize(question.answer);
+            status = isCorrect ? 'correct' : 'incorrect';
         }
-        return NextResponse.json({ success: true });
-    }
 
-    if (action === 'WORD_SEARCH_FINISH' || action === 'MEMORY_FINISH' || action === 'BATTLESHIP_FINISH') {
-        const playerIndex = game.players.findIndex((p: { name: string }) => p.name === player);
-        if (playerIndex > -1) {
-            game.players[playerIndex].score = score;
-            game.players[playerIndex].finished = true;
-            game.markModified('players');
-            await game.save();
-        }
-        return NextResponse.json({ success: true });
-    }
-
-    // Handle Force Finish
-    if (forceFinish) {
         const playerIndex = game.players.findIndex((p: { name: string }) => p.name === player);
         if (playerIndex > -1) {
             const p = game.players[playerIndex];
-            p.finished = true;
-            if (forceStatus === 'correct') {
-                p.score += 100;
+
+            const currentStatus = p.progress.get(letter);
+            if (currentStatus === 'correct' || currentStatus === 'incorrect') {
+                return NextResponse.json({ message: 'Already answered', status: currentStatus, score: p.score }, { status: 400 });
             }
+
+            p.progress.set(letter, status);
+
+            if (isCorrect) {
+                p.score += 1;
+            }
+
+            const totalQuestions = config.questions.length;
+            const answeredCount = Array.from(p.progress.values()).filter(s => s === 'correct' || s === 'incorrect').length;
+
+            if (answeredCount === totalQuestions) {
+                p.finished = true;
+            }
+
             game.markModified('players');
 
             const allFinished = game.players.every((pl: { finished: boolean }) => pl.finished);
             if (allFinished && game.players.length > 0) {
                 game.status = 'FINISHED';
             }
+
             await game.save();
-            return NextResponse.json({ success: true });
+
+            return NextResponse.json({ correct: isCorrect, status, score: p.score });
         }
+
         return NextResponse.json({ message: 'Player not found' }, { status: 404 });
+    } catch (error) {
+        console.error(error);
+        return NextResponse.json({ message: 'Error' }, { status: 500 });
     }
-
-    // Rosco game logic
-    const question = config.questions.find((q: { letter: string; answer: string }) => q.letter === letter);
-
-    let isCorrect = false;
-    let status = 'pasapalabra';
-
-    if (action === 'answer') {
-        const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-        isCorrect = normalize(answer) === normalize(question.answer);
-        status = isCorrect ? 'correct' : 'incorrect';
-    }
-
-    const playerIndex = game.players.findIndex((p: { name: string }) => p.name === player);
-    if (playerIndex > -1) {
-        const p = game.players[playerIndex];
-
-        const currentStatus = p.progress.get(letter);
-        if (currentStatus === 'correct' || currentStatus === 'incorrect') {
-            return NextResponse.json({ message: 'Already answered', status: currentStatus, score: p.score }, { status: 400 });
-        }
-
-        p.progress.set(letter, status);
-
-        if (isCorrect) {
-            p.score += 1;
-        }
-
-        const totalQuestions = config.questions.length;
-        const answeredCount = Array.from(p.progress.values()).filter(s => s === 'correct' || s === 'incorrect').length;
-
-        if (answeredCount === totalQuestions) {
-            p.finished = true;
-        }
-
-        game.markModified('players');
-
-        const allFinished = game.players.every((pl: { finished: boolean }) => pl.finished);
-        if (allFinished && game.players.length > 0) {
-            game.status = 'FINISHED';
-        }
-
-        await game.save();
-
-        return NextResponse.json({ correct: isCorrect, status, score: p.score });
-    }
-
-    return NextResponse.json({ message: 'Player not found' }, { status: 404 });
-} catch (error) {
-    console.error(error);
-    return NextResponse.json({ message: 'Error' }, { status: 500 });
-}
 }
