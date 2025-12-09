@@ -69,7 +69,7 @@ export default function HostPage() {
         });
 
         if (action === 'NEXT_QUESTION') {
-            setTriviaTimer(20);
+            setTriviaTimer(5); // Reduced to 5 seconds
             setIsTimerRunning(true);
         }
     };
@@ -192,26 +192,14 @@ export default function HostPage() {
                         </div>
 
                         {/* Controls */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <button
-                                onClick={() => handleTriviaAction('OPEN_BUZZER')}
-                                disabled={triviaState.buzzerOpen || !!triviaState.buzzedPlayer}
-                                className={cn(
-                                    "p-6 rounded-xl font-bold text-xl transition-all flex flex-col items-center gap-2",
-                                    triviaState.buzzerOpen
-                                        ? "bg-green-600/20 text-green-400 border-2 border-green-500"
-                                        : "bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20"
-                                )}
-                            >
-                                {triviaTimer > 0 ? (
-                                    <>
-                                        <span className="text-3xl font-mono">{triviaTimer}s</span>
-                                        <span className="text-sm opacity-80">Auto-apertura en breve</span>
-                                    </>
-                                ) : (
-                                    "¡ABRIR PULSADORES!"
-                                )}
-                            </button>
+                        <div className="grid grid-cols-1 gap-4">
+                            {/* Auto-timer display */}
+                            {triviaTimer > 0 && (
+                                <div className="bg-blue-900/20 border border-blue-500/20 p-4 rounded-xl text-center mb-4">
+                                    <p className="text-gray-400 text-sm uppercase tracking-widest mb-1">Pulsadores se abren en</p>
+                                    <p className="text-4xl font-mono font-bold text-blue-400">{triviaTimer}s</p>
+                                </div>
+                            )}
 
                             <button
                                 onClick={() => handleTriviaAction('NEXT_QUESTION')}

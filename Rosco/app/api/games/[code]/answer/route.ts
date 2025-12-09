@@ -91,21 +91,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
                             game.triviaState.buzzedPlayer = game.triviaState.buzzQueue[0];
                             game.triviaState.buzzTime = new Date();
                         } else {
-                            // Queue empty - everyone who buzzed got it wrong
-                            // Auto-advance to next question
+                            // Queue empty - Re-open buzzer for everyone else
                             game.triviaState.buzzedPlayer = null;
-                            game.triviaState.buzzerOpen = false;
-                            game.triviaState.buzzQueue = [];
-                            game.triviaState.attemptedPlayers = [];
-                            game.triviaState.lastAnswerCorrect = false;
-
-                            // Move to next question
-                            game.triviaState.currentQuestionIndex = (game.triviaState.currentQuestionIndex || 0) + 1;
-
-                            // Check if game finished
-                            if (game.triviaState.currentQuestionIndex >= config.questions.length) {
-                                game.status = 'FINISHED';
-                            }
+                            game.triviaState.buzzerOpen = true; // RE-OPEN BUZZER
+                            // Do NOT clear attemptedPlayers, so they can't buzz again
                         }
                     }
                     game.markModified('players');
