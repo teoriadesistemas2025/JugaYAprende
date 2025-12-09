@@ -23,7 +23,7 @@ const GameSessionSchema = new mongoose.Schema({
         buzzTime: Date,
         lastAnswerCorrect: Boolean,
         buzzQueue: [String],
-        buzzQueue: [String],
+
         attemptedPlayers: [String],
         buzzerEnableTime: Date, // Timestamp when buzzer automatically opens
     },
