@@ -142,12 +142,17 @@ export default function EditGamePage() {
     }
 
     if (game?.type === 'TRIVIA' || game?.type === 'KAHOOT') {
+        // Handle both { questions: [...] } and { questions: { questions: [...] } }
+        const triviaQuestions = Array.isArray(game.questions)
+            ? game.questions
+            : (game.questions?.questions || []);
+
         return (
             <div className="min-h-screen bg-slate-900 p-8">
                 <TriviaEditor
                     initialData={{
                         title: game.title,
-                        questions: game.questions.questions || []
+                        questions: triviaQuestions
                     }}
                     onSave={handleGenericSave}
                     onCancel={() => router.back()}
