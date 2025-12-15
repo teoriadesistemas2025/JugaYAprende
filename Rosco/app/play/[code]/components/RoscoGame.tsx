@@ -62,7 +62,7 @@ export default function RoscoGame({ data, player, code, onFinish, onScoreUpdate 
     useEffect(() => {
         if (!isActive || finished) return;
         const timer = setInterval(() => {
-            setTimeLeft(prev => {
+            setTimeLeft((prev: number) => {
                 if (prev <= 1) {
                     finishGame('TIMEOUT');
                     return 0;
