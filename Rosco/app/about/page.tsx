@@ -22,7 +22,7 @@ export default function AboutPage() {
         <section className="space-y-4">
           <h2 className="text-2xl font-semibold text-blue-400">¿Qué es Juga y Aprende?</h2>
           <p className="text-gray-300 leading-relaxed text-lg">
-            Juga y Aprende es una plataforma educativa interactiva diseñada para transformar la manera en que los estudiantes interactúan con el conocimiento. Nuestro objetivo es fusionar el juego con el aprendizaje, creando un entorno donde estudiar se convierte en una experiencia divertida y motivadora.
+            Juga y Aprende es una plataforma educativa interactiva desarrollada como recurso complementario para la materia Teoría de Sistemas, dictada por el Profesor Marcelo Castro en la Universidad Argentina de la Empresa (UADE), dentro del Departamento de Tecnología Informática. La plataforma combina contenidos académicos con dinámicas de juego, permitiendo que los estudiantes interactúen con los conceptos vistos en clase de una forma más práctica y atractiva. A través de distintos juegos didácticos, se refuerzan nociones clave de la materia y se facilita su comprensión mediante la participación activa.
           </p>
         </section>
 
