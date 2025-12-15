@@ -11,29 +11,26 @@ interface HangmanGameProps {
     player: string;
     code: string;
     onFinish: (score: number) => void;
+    onScoreUpdate?: (score: number) => void;
 }
 
 const MAX_MISTAKES = 6;
 
-export default function HangmanGame({ data, player, code, onFinish }: HangmanGameProps) {
+export default function HangmanGame({ data, player, code, onFinish, onScoreUpdate }: HangmanGameProps) {
     const { config, players } = data;
+    const word = (config.questions.word || '').toUpperCase();
+
     const [guessedLetters, setGuessedLetters] = useState<Set<string>>(new Set());
     const [mistakes, setMistakes] = useState(0);
     const [status, setStatus] = useState<'PLAYING' | 'WON' | 'LOST'>('PLAYING');
     const [hasSubmitted, setHasSubmitted] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
+    const [score, setScore] = useState(0);
 
     // Hints Logic
-    const [currentHint, setCurrentHint] = useState('');
-
-    useEffect(() => {
-        const hints = config.questions.hints || (config.questions.hint ? [config.questions.hint] : []);
-        if (hints.length > 0) {
-            // Pick a random hint that is different from the last one if possible? 
-            // For now, just pick random.
-            const randomHint = hints[Math.floor(Math.random() * hints.length)];
-            setCurrentHint(randomHint);
-        }
-    }, [config]);
+    const hints = config.questions.hints || (config.questions.hint ? [config.questions.hint] : []);
+    // Show one hint per mistake made
+    const visibleHints = hints.slice(0, mistakes);
 
     // Timer Logic
     const timeLimit = config.questions.timeLimit || 300; // Default 300s
@@ -56,13 +53,8 @@ export default function HangmanGame({ data, player, code, onFinish }: HangmanGam
         return () => clearInterval(timer);
     }, [status]);
 
-    const word = (config.questions.word || '').toUpperCase();
-
-    // Check if everyone finished
-    const allFinished = players.length > 0 && players.every((p: any) => p.finished);
-
+    // Check win/loss condition
     useEffect(() => {
-        // Check win/loss condition
         if (status !== 'PLAYING') return;
 
         const isWon = word.split('').every((char: string) => guessedLetters.has(char) || char === ' ');
@@ -77,12 +69,16 @@ export default function HangmanGame({ data, player, code, onFinish }: HangmanGam
         setStatus(result);
         if (!hasSubmitted) {
             setHasSubmitted(true);
-            // Score calculation: Base 1000 - Mistakes * 100 + Time Bonus (1 point per second left)
-            const score = result === 'WON' ? Math.max(0, 1000 - (mistakes * 100) + timeLeft) : 0;
+
+            let finalScore = score;
             if (result === 'WON') {
+                const timeBonus = timeLeft * 10; // 10 pts per second left
+                const winBonus = 500;
+                finalScore += timeBonus + winBonus;
                 confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
             }
-            onFinish(score);
+
+            onFinish(finalScore);
         }
     };
 
@@ -93,7 +89,14 @@ export default function HangmanGame({ data, player, code, onFinish }: HangmanGam
         newGuessed.add(letter);
         setGuessedLetters(newGuessed);
 
-        if (!word.includes(letter)) {
+        if (word.includes(letter)) {
+            // Calculate points: 50 per occurrence
+            const count = word.split('').filter((char: string) => char === letter).length;
+            const points = count * 50;
+            const newScore = score + points;
+            setScore(newScore);
+            if (onScoreUpdate) onScoreUpdate(newScore);
+        } else {
             setMistakes(prev => prev + 1);
         }
     };
@@ -141,75 +144,137 @@ export default function HangmanGame({ data, player, code, onFinish }: HangmanGam
         }
     };
 
-    // --- VIEW: GLOBAL LEADERBOARD (Everyone Finished) ---
-    if (allFinished) {
-        return (
-            <div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center">
-                <div className="max-w-2xl w-full bg-white/5 rounded-2xl p-8 border border-white/10 animate-in zoom-in duration-500">
-                    <div className="text-center mb-8">
-                        <h1 className="text-4xl font-bold text-yellow-400 mb-2">¡Juego Terminado!</h1>
-                        <p className="text-gray-400">La palabra era:</p>
-                        <div className="text-3xl font-mono font-bold text-white mt-2 tracking-widest bg-white/10 py-2 rounded-lg inline-block px-8">
-                            {word}
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-bold flex items-center gap-2 mb-4">
-                            <Trophy className="w-6 h-6 text-yellow-400" /> Mejores Jugadores
-                        </h2>
-                        {players.sort((a: any, b: any) => b.score - a.score).slice(0, 3).map((p: any, i: number) => (
-                            <div key={i} className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
-                                <div className="flex items-center gap-4">
-                                    <div className={cn(
-                                        "w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg",
-                                        i === 0 ? "bg-yellow-500 text-black" :
-                                            i === 1 ? "bg-gray-400 text-black" :
-                                                i === 2 ? "bg-orange-700 text-white" : "bg-gray-700 text-gray-300"
-                                    )}>
-                                        {i + 1}
-                                    </div>
-                                    <span className="font-bold text-xl">{p.name}</span>
-                                </div>
-                                <span className="font-mono font-bold text-2xl text-yellow-400">{p.score}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // --- VIEW: WAITING FOR OTHERS (I finished, others haven't) ---
+    // --- VIEW: GAME OVER (Won/Lost/Waiting) ---
     if (status !== 'PLAYING') {
+        const sortedPlayers = [...players].sort((a: any, b: any) => b.score - a.score);
+        const top3 = sortedPlayers.slice(0, 3);
+        const myPlayerObj = players.find((p: any) => p.name === player);
+        const myRankIndex = sortedPlayers.findIndex((p: any) => p.name === player);
+        const amIInTop3 = myRankIndex < 3 && myRankIndex !== -1;
+
         return (
-            <div className="min-h-screen bg-slate-900 text-white p-8 flex flex-col items-center justify-center">
-                <div className="text-center space-y-6">
-                    {status === 'WON' ? (
-                        <div className="text-green-400 text-5xl font-bold mb-4 animate-bounce">¡GANASTE! 🎉</div>
-                    ) : (
-                        <div className="text-red-500 text-5xl font-bold mb-4 animate-pulse">¡PERDISTE! 💀</div>
+            <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 overflow-hidden">
+                <div className="max-w-4xl w-full bg-slate-800 rounded-2xl p-6 border border-white/10 shadow-2xl relative">
+                    {/* Confetti if won */}
+                    {status === 'WON' && <div className="absolute inset-0 overflow-hidden pointer-events-none" />}
+
+                    {/* Result Header */}
+                    <div className="text-center mb-8">
+                        <h1 className={cn(
+                            "text-5xl font-black mb-2 animate-bounce",
+                            status === 'WON' ? "text-yellow-400 drop-shadow-[0_0_10px_rgba(250,204,21,0.5)]" : "text-red-500 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]"
+                        )}>
+                            {status === 'WON' ? '¡GANASTE!' : '¡TIEMPO AGOTADO!'}
+                        </h1>
+                        <p className={cn(
+                            "text-xl font-medium",
+                            status === 'WON' ? "text-yellow-200" : "text-red-400"
+                        )}>
+                            {status === 'WON'
+                                ? '¡Has descubierto la palabra secreta!'
+                                : 'No lograste adivinar la palabra a tiempo'}
+                        </p>
+                    </div>
+
+                    {/* Podium */}
+                    <div className="flex justify-center items-end gap-4 mb-12 h-64">
+                        {/* 2nd Place */}
+                        {top3[1] && (
+                            <div className="flex flex-col items-center w-1/3 animate-in slide-in-from-bottom duration-700 delay-100">
+                                <span className="text-gray-300 font-bold mb-2 truncate max-w-full text-sm md:text-base">{top3[1].name}</span>
+                                <div className="w-full bg-slate-600 h-32 rounded-t-lg flex flex-col items-center justify-between p-2 border-t-4 border-gray-400 relative">
+                                    <span className="text-4xl font-black text-white/20 absolute bottom-0">2</span>
+                                    <span className="font-mono font-bold text-white bg-black/30 px-2 rounded">{top3[1].score || 0}</span>
+                                    {!top3[1].finished && <Loader2 className="w-4 h-4 text-white/50 animate-spin absolute top-2 right-2" />}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 1st Place */}
+                        {top3[0] && (
+                            <div className="flex flex-col items-center w-1/3 animate-in slide-in-from-bottom duration-700 z-10">
+                                <div className="mb-2 text-yellow-500">
+                                    <Trophy className="w-8 h-8 animate-pulse" />
+                                </div>
+                                <span className="text-yellow-400 font-bold mb-2 truncate max-w-full text-lg md:text-xl transform -translate-y-1">{top3[0].name}</span>
+                                <div className="w-full bg-yellow-600 h-48 rounded-t-lg flex flex-col items-center justify-between p-2 border-t-4 border-yellow-300 shadow-[0_0_30px_rgba(234,179,8,0.3)] relative">
+                                    <span className="text-6xl font-black text-white/20 absolute bottom-0">1</span>
+                                    <span className="font-mono font-bold text-white bg-black/30 px-3 py-1 rounded text-lg">{top3[0].score || 0}</span>
+                                    {!top3[0].finished && <Loader2 className="w-4 h-4 text-white/50 animate-spin absolute top-2 right-2" />}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 3rd Place */}
+                        {top3[2] && (
+                            <div className="flex flex-col items-center w-1/3 animate-in slide-in-from-bottom duration-700 delay-200">
+                                <span className="text-orange-300 font-bold mb-2 truncate max-w-full text-sm md:text-base">{top3[2].name}</span>
+                                <div className="w-full bg-orange-700 h-24 rounded-t-lg flex flex-col items-center justify-between p-2 border-t-4 border-orange-400 relative">
+                                    <span className="text-4xl font-black text-white/20 absolute bottom-0">3</span>
+                                    <span className="font-mono font-bold text-white bg-black/30 px-2 rounded">{top3[2].score || 0}</span>
+                                    {!top3[2].finished && <Loader2 className="w-4 h-4 text-white/50 animate-spin absolute top-2 right-2" />}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* My Rank (if not in podium) */}
+                    {!amIInTop3 && myPlayerObj && (
+                        <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between mb-8 max-w-md mx-auto">
+                            <div className="flex items-center gap-4">
+                                <span className="text-gray-400 font-bold text-xl">#{myRankIndex + 1}</span>
+                                <div className="text-left">
+                                    <p className="text-white font-bold">{myPlayerObj.name}</p>
+                                    <p className="text-xs text-gray-400">Tu posición actual</p>
+                                </div>
+                            </div>
+                            <span className="font-mono font-bold text-cyan-400 text-xl">{myPlayerObj.score}</span>
+                        </div>
                     )}
 
-                    <div className="bg-white/5 p-8 rounded-2xl border border-white/10 max-w-md mx-auto">
-                        <Loader2 className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
-                        <h2 className="text-2xl font-bold mb-2">Esperando a los demás...</h2>
-                        <p className="text-gray-400">El ranking final se mostrará cuando todos terminen.</p>
-
-                        <div className="mt-6 flex flex-wrap justify-center gap-2">
-                            {players.map((p: any, i: number) => (
-                                <div key={i} className={cn(
-                                    "px-3 py-1 rounded-full text-sm border flex items-center gap-2",
-                                    p.finished
-                                        ? "bg-green-900/30 border-green-500/30 text-green-400"
-                                        : "bg-blue-900/30 border-blue-500/30 text-blue-400 animate-pulse"
-                                )}>
-                                    {p.name}
-                                    {p.finished && "✓"}
-                                </div>
-                            ))}
-                        </div>
+                    {/* Reveal Button */}
+                    <div className="flex justify-center mt-6">
+                        <button
+                            onClick={() => setShowDetails(true)}
+                            className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 px-8 rounded-full border border-white/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                        >
+                            🔍 Ver Solución y Pistas
+                        </button>
                     </div>
+
+                    {/* Details Modal/Overlay */}
+                    {showDetails && (
+                        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                            <div className="bg-slate-900 border border-white/10 rounded-2xl max-w-2xl w-full p-8 relative shadow-2xl animate-in zoom-in-95 duration-300">
+                                <button
+                                    onClick={() => setShowDetails(false)}
+                                    className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                                >
+                                    ✕ Cerrar
+                                </button>
+
+                                <div className="text-center space-y-8">
+                                    <div>
+                                        <p className="text-sm text-gray-400 uppercase tracking-widest mb-4">Palabra Oculta</p>
+                                        <p className="text-3xl md:text-5xl font-mono font-bold text-white tracking-widest break-words">{typeof word === 'string' ? word : JSON.stringify(word)}</p>
+                                    </div>
+
+                                    {Array.isArray(hints) && hints.length > 0 && (
+                                        <div className="pt-8 border-t border-white/10">
+                                            <p className="text-sm text-gray-400 mb-4">Todas las Pistas</p>
+                                            <div className="flex flex-col gap-3">
+                                                {hints.map((h: any, i: number) => (
+                                                    <div key={i} className="bg-blue-900/20 text-blue-200 px-4 py-3 rounded-lg text-lg border border-blue-500/10">
+                                                        💡 {typeof h === 'string' ? h : JSON.stringify(h)}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -257,12 +322,24 @@ export default function HangmanGame({ data, player, code, onFinish }: HangmanGam
 
                 {/* Right: Word & Keyboard */}
                 <div className="flex flex-col items-center gap-8">
-                    {/* Hint */}
-                    {currentHint && (
-                        <div className="bg-blue-900/30 px-4 py-2 rounded-lg text-blue-300 text-sm border border-blue-500/20">
-                            Pista: {currentHint}
-                        </div>
-                    )}
+                    {/* Hints Container */}
+                    <div className="flex flex-col gap-2 w-full max-w-lg h-16 justify-center">
+                        {visibleHints.length > 0 ? (
+                            <motion.div
+                                key={visibleHints.length} // Key changes on new hint, triggering animation
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                className="bg-blue-900/40 px-4 py-2 rounded-lg text-blue-300 text-sm border border-blue-500/20 text-center shadow-lg"
+                            >
+                                💡 Pista {visibleHints.length}: {visibleHints[visibleHints.length - 1]}
+                            </motion.div>
+                        ) : (
+                            mistakes === 0 && hints.length > 0 && (
+                                <p className="text-gray-500 text-xs text-center italic">Comete un error para obtener pistas...</p>
+                            )
+                        )}
+                    </div>
 
                     {/* Word Display */}
                     <div className="flex flex-wrap justify-center gap-2">

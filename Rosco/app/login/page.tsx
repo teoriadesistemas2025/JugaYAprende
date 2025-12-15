@@ -39,7 +39,7 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900">
             <div className="w-full max-w-md">
                 <div className="bg-card border border-white/10 rounded-2xl p-8 shadow-2xl">
                     <div className="flex items-center justify-center mb-8">

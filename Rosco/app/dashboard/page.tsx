@@ -114,7 +114,7 @@ export default function DashboardPage() {
     const hasGames = roscos.length > 0;
 
     return (
-        <div className="min-h-screen bg-background p-8">
+        <div className="min-h-screen bg-slate-900 p-8">
             <div className="max-w-6xl mx-auto">
                 <header className="flex justify-between items-center mb-12">
                     <div>
@@ -159,7 +159,7 @@ export default function DashboardPage() {
                                         {getTypeTitle(type)}
                                     </h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {games.map((rosco) => (
+                                        {games.sort((a, b) => a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' })).map((rosco) => (
                                             <div key={rosco._id} className="bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-500/10 transition-all group relative overflow-hidden">
                                                 <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-bl-full -mr-10 -mt-10 transition-transform group-hover:scale-110`} />
 

@@ -49,7 +49,7 @@ export default function RegisterPage() {
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center p-4">
+        <div className="flex min-h-screen items-center justify-center p-4 bg-slate-900">
             <div className="w-full max-w-md space-y-8 rounded-2xl bg-card p-8 shadow-2xl border border-white/10 backdrop-blur-sm">
                 <div className="text-center">
                     <h2 className="text-3xl font-bold tracking-tight text-white">Crear cuenta</h2>

@@ -14,8 +14,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
 
         const config = await GameConfig.findById(game.configId);
 
-        // TRIVIA LOGIC
-        if (config.type === 'TRIVIA') {
+        // TRIVIA BUZZER LOGIC
+        if (config.type === 'TRIVIA' && action === 'BUZZ') {
             // Allow buzzing if:
             // 1. Buzzer is explicitly open, OR
             // 2. Timer has passed (buzzerEnableTime), OR
@@ -36,6 +36,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
                     if (!game.triviaState.buzzedPlayer) {
                         game.triviaState.buzzedPlayer = player;
                         game.triviaState.buzzTime = new Date();
+
+                        // Set answer deadline based on question timeLimit
+                        const currentQ = config.questions[game.triviaState.currentQuestionIndex];
+                        const timeLimit = (currentQ.timeLimit || 20) * 1000; // Default 20 seconds
+                        game.triviaState.answerDeadline = new Date(Date.now() + timeLimit);
+
                         // Auto-open buzzer for others to join queue
                         game.triviaState.buzzerOpen = true;
                     }
@@ -49,14 +55,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
             return NextResponse.json({ success: false, reason: 'LOCKED' });
         }
 
-        if (action === 'TRIVIA_ANSWER') {
+        // Handle timeout (treat as incorrect answer)
+        if (action === 'TRIVIA_TIMEOUT' || action === 'TRIVIA_ANSWER') {
             // Verify it's the buzzed player
             if (game.triviaState?.buzzedPlayer !== player) {
                 return NextResponse.json({ message: 'Not your turn' }, { status: 403 });
             }
 
             const currentQ = config.questions[game.triviaState.currentQuestionIndex];
-            const isCorrect = answer === currentQ.options[0];
+            // Timeout is always incorrect
+            const isCorrect = action === 'TRIVIA_TIMEOUT' ? false : (answer === currentQ.options[0]);
 
             const playerIndex = game.players.findIndex((p: { name: string }) => p.name === player);
             if (playerIndex > -1) {
@@ -104,11 +112,35 @@ export async function POST(req: Request, { params }: { params: Promise<{ code: s
                         // Next player in queue gets to answer
                         game.triviaState.buzzedPlayer = game.triviaState.buzzQueue[0];
                         game.triviaState.buzzTime = new Date();
+
+                        // Set answer deadline for this player
+                        const currentQ = config.questions[game.triviaState.currentQuestionIndex];
+                        const timeLimit = (currentQ.timeLimit || 20) * 1000;
+                        game.triviaState.answerDeadline = new Date(Date.now() + timeLimit);
                     } else {
-                        // Queue empty - Re-open buzzer for everyone else (Infinite Retry)
-                        game.triviaState.buzzedPlayer = null;
-                        game.triviaState.buzzerOpen = true; // RE-OPEN BUZZER
-                        game.triviaState.attemptedPlayers = []; // RESET ATTEMPTS so everyone can try again
+                        // Queue empty - Check if all players have attempted this question
+                        const totalPlayers = game.players.length;
+                        const attemptedCount = game.triviaState.attemptedPlayers.length;
+
+                        if (attemptedCount >= totalPlayers) {
+                            // All players attempted - Move to next question
+                            game.triviaState.currentQuestionIndex += 1;
+                            game.triviaState.buzzedPlayer = null;
+                            game.triviaState.buzzQueue = [];
+                            game.triviaState.attemptedPlayers = [];
+                            game.triviaState.buzzerEnableTime = new Date(Date.now() + 5000); // 5 second delay
+                            game.triviaState.buzzerOpen = false; // Will open after timer
+
+                            // Check if game finished
+                            if (game.triviaState.currentQuestionIndex >= config.questions.length) {
+                                game.status = 'FINISHED';
+                            }
+                        } else {
+                            // Not all attempted - Re-open buzzer for remaining players
+                            game.triviaState.buzzedPlayer = null;
+                            game.triviaState.buzzerOpen = true;
+                            // Keep attemptedPlayers intact - they stay blocked for this question
+                        }
                     }
                 }
                 game.markModified('players');

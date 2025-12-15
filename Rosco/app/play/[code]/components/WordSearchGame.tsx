@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import confetti from 'canvas-confetti';
 import { Check, Trophy } from 'lucide-react';
@@ -20,10 +20,17 @@ interface Cell {
     found: boolean;
 }
 
-export default function WordSearchGame({ data, player, onFinish }: WordSearchGameProps) {
+export default function WordSearchGame({ data, player, code, onFinish }: WordSearchGameProps) {
     const config = data.config.questions;
+    const initialized = useRef(false);
+    const gridRef = useRef<HTMLDivElement>(null);
+
+    // Config
+    const gridSize = config.gridSize || 15;
+
+    // State
     const [grid, setGrid] = useState<Cell[][]>([]);
-    const [words, setWords] = useState<{ word: string; found: boolean }[]>([]);
+    const [words, setWords] = useState<{ word: string; clue?: string; found: boolean }[]>([]);
     const [isSelecting, setIsSelecting] = useState(false);
     const [selectionStart, setSelectionStart] = useState<{ x: number; y: number } | null>(null);
     const [selectedCells, setSelectedCells] = useState<{ x: number; y: number }[]>([]);
@@ -31,12 +38,46 @@ export default function WordSearchGame({ data, player, onFinish }: WordSearchGam
     const [finished, setFinished] = useState(false);
     const [timeLeft, setTimeLeft] = useState(config.timeLimit || 300);
     const [status, setStatus] = useState<'PLAYING' | 'WON' | 'LOST'>('PLAYING');
-
-    const gridSize = config.gridSize || 15;
+    const [showExplanations, setShowExplanations] = useState(false);
 
     useEffect(() => {
-        initializeGame();
-    }, [config]);
+        if (!initialized.current) {
+            const storageKey = `wordsearch_${code}_${player}`;
+            const savedData = localStorage.getItem(storageKey);
+
+            if (savedData) {
+                try {
+                    const parsed = JSON.parse(savedData);
+                    // Validate parsed data structure briefly
+                    if (parsed.grid && parsed.words) {
+                        setGrid(parsed.grid);
+                        setWords(parsed.words);
+                        initialized.current = true;
+
+                        // Check if server says finished, override local finished state if needed
+                        // Check if server says finished, override local finished state if needed
+                        const myPlayer = data.players.find((p: any) => p.name === player);
+                        if (myPlayer && myPlayer.finished) {
+                            setFinished(true);
+                            // Determine if won or lost based on local state if available
+                            if (parsed.words.every((w: any) => w.found)) {
+                                setStatus('WON');
+                            } else {
+                                setStatus('LOST');
+                            }
+                        }
+                        return;
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Failed to parse saved game", e);
+                }
+            }
+
+            initializeGame();
+            initialized.current = true;
+        }
+    }, [code, player]);
 
     // Timer Sync Logic
     useEffect(() => {
@@ -72,8 +113,13 @@ export default function WordSearchGame({ data, player, onFinish }: WordSearchGam
 
     const initializeGame = () => {
         // Initialize words
-        const initialWords = config.words.map((w: string) => ({ word: w.toUpperCase(), found: false }));
-        setWords(initialWords);
+        const initialWords = config.words.map((w: string | { word: string, clue: string }) => {
+            if (typeof w === 'string') {
+                return { word: w.toUpperCase(), found: false };
+            } else {
+                return { word: w.word.toUpperCase(), clue: w.clue, found: false };
+            }
+        });
 
         // Generate Grid
         const newGrid: Cell[][] = Array(gridSize).fill(null).map((_, y) =>
@@ -136,12 +182,21 @@ export default function WordSearchGame({ data, player, onFinish }: WordSearchGam
         }
 
         setGrid(newGrid);
+        setWords(initialWords);
 
+        // Save to LocalStorage
+        const storageKey = `wordsearch_${code}_${player}`;
+        localStorage.setItem(storageKey, JSON.stringify({
+            grid: newGrid,
+            words: initialWords
+        }));
+
+        // Restore state if player already finished
         // Restore state if player already finished
         const myPlayer = data.players.find((p: any) => p.name === player);
         if (myPlayer && myPlayer.finished) {
             setFinished(true);
-            setStatus('WON'); // Assuming if finished it's won, or check score > 0
+            setStatus(myPlayer.score > 0 ? 'WON' : 'LOST');
         }
     };
 
@@ -225,8 +280,35 @@ export default function WordSearchGame({ data, player, onFinish }: WordSearchGam
     };
 
     if (finished) {
-        const sortedPlayers = [...data.players].sort((a: any, b: any) => b.score - a.score).slice(0, 5);
-        const myScore = data.players.find((p: any) => p.name === player)?.score || 0;
+        if (showExplanations) {
+            return (
+                <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white p-4">
+                    <div className="max-w-md w-full bg-white/5 rounded-2xl p-8 border border-white/10 text-center animate-in zoom-in duration-500 max-h-[90vh] overflow-y-auto">
+                        <h2 className="text-2xl font-bold mb-6 text-green-400">Explicaciones</h2>
+
+                        <div className="space-y-4 text-left">
+                            {words.map((w, i) => (
+                                <div key={i} className="bg-white/5 p-4 rounded-xl border border-white/10">
+                                    <h3 className="font-bold text-lg mb-1">{w.word}</h3>
+                                    <p className="text-gray-300 text-sm">{w.clue || "Sin explicación disponible."}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={() => setShowExplanations(false)}
+                            className="mt-8 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl font-bold w-full transition-all"
+                        >
+                            Volver a Resultados
+                        </button>
+                    </div>
+                </div>
+            )
+        }
+
+        const sortedPlayers = [...data.players].sort((a: any, b: any) => b.score - a.score).slice(0, 3);
+        const myRankIndex = [...data.players].sort((a: any, b: any) => b.score - a.score).findIndex((p: any) => p.name === player);
+        const myPlayer = data.players.find((p: any) => p.name === player);
 
         return (
             <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white p-4">
@@ -245,9 +327,9 @@ export default function WordSearchGame({ data, player, onFinish }: WordSearchGam
                         </>
                     )}
 
-                    <p className="text-xl text-gray-400 mb-8">Tu puntaje: <span className="text-yellow-400 font-bold">{myScore}</span></p>
+                    <p className="text-xl text-gray-400 mb-8">Tu puntaje: <span className="text-yellow-400 font-bold">{myPlayer?.score || 0}</span></p>
 
-                    <h2 className="text-xl font-bold mb-4 text-left">Ranking Top 5</h2>
+                    <h2 className="text-xl font-bold mb-4 text-left">🏆 Podio</h2>
                     <div className="space-y-3">
                         {sortedPlayers.map((p: any, i: number) => (
                             <div key={i} className={cn(
@@ -255,13 +337,39 @@ export default function WordSearchGame({ data, player, onFinish }: WordSearchGam
                                 p.name === player ? "bg-blue-600/30 border border-blue-500/50" : "bg-white/5"
                             )}>
                                 <div className="flex items-center gap-3">
-                                    <span className={cn("font-bold w-6", i === 0 ? "text-yellow-400" : "text-gray-500")}>#{i + 1}</span>
+                                    <span className={cn("font-bold w-6",
+                                        i === 0 ? "text-yellow-400 text-xl" :
+                                            i === 1 ? "text-gray-300 text-lg" :
+                                                i === 2 ? "text-amber-700 text-lg" : "text-gray-500"
+                                    )}>
+                                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                                    </span>
                                     <span>{p.name}</span>
                                 </div>
                                 <span className="font-mono font-bold">{p.score}</span>
                             </div>
                         ))}
+
+                        {myRankIndex > 2 && (
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                                <p className="text-sm text-gray-400 mb-2 text-left">Tu posición:</p>
+                                <div className="flex justify-between items-center p-3 rounded-lg bg-blue-600/30 border border-blue-500/50">
+                                    <div className="flex items-center gap-3">
+                                        <span className="font-bold w-6 text-gray-400">#{myRankIndex + 1}</span>
+                                        <span>{player}</span>
+                                    </div>
+                                    <span className="font-mono font-bold">{myPlayer?.score}</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
+
+                    <button
+                        onClick={() => setShowExplanations(true)}
+                        className="mt-8 bg-green-600 hover:bg-green-500 text-white px-8 py-3 rounded-xl font-bold w-full transition-all flex items-center justify-center gap-2"
+                    >
+                        Ver Explicaciones 📖
+                    </button>
                 </div>
             </div>
         );
@@ -286,29 +394,58 @@ export default function WordSearchGame({ data, player, onFinish }: WordSearchGam
                 {/* Grid */}
                 <div className="flex-1 w-full flex justify-center">
                     <div
-                        className="bg-white/5 p-4 rounded-xl border border-white/10 touch-none"
+                        ref={gridRef}
+                        className="bg-white/5 p-4 rounded-xl border border-white/10 touch-none select-none"
                         style={{
                             display: 'grid',
                             gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
                             gap: '2px',
-                            maxWidth: '100%',
+                            width: '100%',
+                            maxWidth: '600px',
                             aspectRatio: '1/1'
                         }}
+                        onMouseLeave={handleMouseUp}
+                        onTouchStart={(e) => {
+                            if (finished || status !== 'PLAYING') return;
+                            const touch = e.touches[0];
+                            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                            const cellDiv = element?.closest('[data-x]');
+                            if (cellDiv) {
+                                const x = parseInt(cellDiv.getAttribute('data-x') || '0');
+                                const y = parseInt(cellDiv.getAttribute('data-y') || '0');
+                                handleMouseDown(x, y);
+                            }
+                        }}
+                        onTouchMove={(e) => {
+                            if (finished || status !== 'PLAYING') return;
+                            const touch = e.touches[0];
+                            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                            const cellDiv = element?.closest('[data-x]');
+                            if (cellDiv) {
+                                const x = parseInt(cellDiv.getAttribute('data-x') || '0');
+                                const y = parseInt(cellDiv.getAttribute('data-y') || '0');
+                                handleMouseEnter(x, y);
+                            }
+                        }}
+                        onTouchEnd={handleMouseUp}
                     >
                         {grid.map((row, y) => (
                             row.map((cell, x) => (
                                 <div
                                     key={`${x}-${y}`}
+                                    data-x={x}
+                                    data-y={y}
                                     onMouseDown={() => handleMouseDown(x, y)}
                                     onMouseEnter={() => handleMouseEnter(x, y)}
+                                    // Removed fixed sizes, added w-full h-full and aspect-square
                                     className={cn(
-                                        "w-8 h-8 md:w-10 md:h-10 flex items-center justify-center font-bold text-lg md:text-xl rounded cursor-pointer transition-colors",
+                                        "w-full h-full aspect-square flex items-center justify-center font-bold text-sm md:text-xl rounded cursor-pointer transition-colors user-select-none",
                                         cell.found ? "bg-green-600 text-white" :
                                             isCellSelected(x, y) ? "bg-blue-500 text-white" :
                                                 "bg-white/5 hover:bg-white/10 text-gray-300"
                                     )}
                                 >
-                                    {cell.letter}
+                                    <span className="pointer-events-none">{cell.letter}</span>
                                 </div>
                             ))
                         ))}

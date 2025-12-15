@@ -37,12 +37,79 @@ export default function CreateGamePage() {
     const [hangmanTimeLimit, setHangmanTimeLimit] = useState(300);
 
     // Word Search State
-    const [wordSearchWords, setWordSearchWords] = useState<string[]>([]);
+    const [wordSearchWords, setWordSearchWords] = useState<{ word: string, clue: string }[]>([]);
     const [wordSearchGridSize, setWordSearchGridSize] = useState(15);
     const [wordSearchTimeLimit, setWordSearchTimeLimit] = useState(300);
     const [newWord, setNewWord] = useState('');
+    const [newClue, setNewClue] = useState('');
 
-    // Memory State
+    // ...
+
+    {/* Words Input */ }
+    <div className="bg-card border border-white/10 rounded-xl p-6">
+        <label className="block text-sm font-medium text-gray-400 mb-4">Palabras a Encontrar</label>
+
+        <div className="flex flex-col md:flex-row gap-2 mb-6">
+            <input
+                type="text"
+                value={newWord}
+                onChange={(e) => setNewWord(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none font-mono tracking-wider"
+                placeholder="NUEVA PALABRA"
+                maxLength={wordSearchGridSize}
+            />
+            <input
+                type="text"
+                value={newClue}
+                onChange={(e) => setNewClue(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (newWord.trim() && newWord.length <= wordSearchGridSize) {
+                            setWordSearchWords([...wordSearchWords, { word: newWord.trim(), clue: newClue.trim() }]);
+                            setNewWord('');
+                            setNewClue('');
+                        }
+                    }
+                }}
+                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none"
+                placeholder="Pista / Explicación (Opcional)"
+            />
+            <button
+                onClick={() => {
+                    if (newWord.trim() && newWord.length <= wordSearchGridSize) {
+                        setWordSearchWords([...wordSearchWords, { word: newWord.trim(), clue: newClue.trim() }]);
+                        setNewWord('');
+                        setNewClue('');
+                    }
+                }}
+                disabled={!newWord.trim() || newWord.length > wordSearchGridSize}
+                className="bg-white/10 hover:bg-white/20 text-white px-6 rounded-lg font-bold disabled:opacity-50 transition-colors"
+            >
+                Agregar
+            </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+            {wordSearchWords.map((item, i) => (
+                <div key={i} className="bg-green-900/30 border border-green-500/30 text-green-400 px-3 py-1.5 rounded-lg flex items-center gap-2 group relative" title={item.clue}>
+                    <div className="flex flex-col">
+                        <span className="font-mono font-bold leading-none">{item.word}</span>
+                        {item.clue && <span className="text-[10px] text-green-200/70">{item.clue.length > 20 ? item.clue.substring(0, 20) + '...' : item.clue}</span>}
+                    </div>
+                    <button
+                        onClick={() => setWordSearchWords(wordSearchWords.filter((_, idx) => idx !== i))}
+                        className="hover:text-white transition-colors"
+                    >
+                        ×
+                    </button>
+                </div>
+            ))}
+            {wordSearchWords.length === 0 && (
+                <p className="text-gray-500 italic w-full text-center py-4">No hay palabras agregadas aún</p>
+            )}
+        </div>
+    </div>
     const [memoryPairs, setMemoryPairs] = useState<{ a: string, b: string }[]>([]);
     const [newPair, setNewPair] = useState({ a: '', b: '' });
 
@@ -117,7 +184,7 @@ export default function CreateGamePage() {
 
     if (step === 'TYPE') {
         return (
-            <div className="min-h-screen bg-background p-8 flex items-center justify-center">
+            <div className="min-h-screen bg-slate-900 p-8 flex items-center justify-center">
                 <div className="max-w-4xl w-full">
                     <button
                         onClick={() => router.back()}
@@ -163,16 +230,6 @@ export default function CreateGamePage() {
                             <p className="text-gray-400">Competencia de preguntas y respuestas con pulsadores en vivo.</p>
                         </button>
 
-                        <button
-                            onClick={() => { setGameType('KAHOOT'); setStep('EDITOR'); }}
-                            className="bg-card hover:bg-white/5 border border-white/10 p-8 rounded-3xl text-left transition-all hover:scale-105 group"
-                        >
-                            <div className="w-16 h-16 rounded-2xl bg-orange-600 flex items-center justify-center mb-6 group-hover:shadow-lg group-hover:shadow-orange-500/25 transition-all">
-                                <span className="text-3xl font-bold text-white">K</span>
-                            </div>
-                            <h3 className="text-2xl font-bold text-white mb-2">Desafío</h3>
-                            <p className="text-gray-400">Estilo Kahoot. Todos responden a la vez con tiempo límite y ranking.</p>
-                        </button>
 
                         <button
                             onClick={() => { setGameType('WORD_SEARCH'); setStep('EDITOR'); }}
@@ -185,16 +242,6 @@ export default function CreateGamePage() {
                             <p className="text-gray-400">Encuentra las palabras escondidas en la cuadrícula.</p>
                         </button>
 
-                        <button
-                            onClick={() => { setGameType('MEMORY'); setStep('EDITOR'); }}
-                            className="bg-card hover:bg-white/5 border border-white/10 p-8 rounded-3xl text-left transition-all hover:scale-105 group"
-                        >
-                            <div className="w-16 h-16 rounded-2xl bg-pink-600 flex items-center justify-center mb-6">
-                                <span className="text-3xl font-bold text-white">M</span>
-                            </div>
-                            <h3 className="text-2xl font-bold text-white mb-2">Memorama</h3>
-                            <p className="text-gray-400">Encuentra los pares de cartas iguales.</p>
-                        </button>
 
                         <button
                             onClick={() => { setGameType('BATTLESHIP'); setStep('EDITOR'); }}
@@ -215,7 +262,7 @@ export default function CreateGamePage() {
     // HANGMAN EDITOR
     if (gameType === 'HANGMAN') {
         return (
-            <div className="min-h-screen bg-background p-8">
+            <div className="min-h-screen bg-slate-900 p-8">
                 <div className="max-w-4xl mx-auto space-y-8">
                     {/* Header */}
                     <div className="flex items-center justify-between">
@@ -335,7 +382,7 @@ export default function CreateGamePage() {
     // TRIVIA & KAHOOT EDITOR
     if (gameType === 'TRIVIA' || gameType === 'KAHOOT') {
         return (
-            <div className="min-h-screen bg-background p-8">
+            <div className="min-h-screen bg-slate-900 p-8">
                 <TriviaEditor
                     onSave={async (data) => {
                         setSaving(true);
@@ -367,7 +414,7 @@ export default function CreateGamePage() {
     // WORD SEARCH EDITOR
     if (gameType === 'WORD_SEARCH') {
         return (
-            <div className="min-h-screen bg-background p-8">
+            <div className="min-h-screen bg-slate-900 p-8">
                 <div className="max-w-4xl mx-auto space-y-8">
                     {/* Header */}
                     <div className="flex items-center justify-between">
@@ -436,29 +483,38 @@ export default function CreateGamePage() {
                     <div className="bg-card border border-white/10 rounded-xl p-6">
                         <label className="block text-sm font-medium text-gray-400 mb-4">Palabras a Encontrar</label>
 
-                        <div className="flex gap-2 mb-6">
+                        <div className="flex flex-col md:flex-row gap-2 mb-6">
                             <input
                                 type="text"
                                 value={newWord}
                                 onChange={(e) => setNewWord(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        if (newWord.trim() && newWord.length <= wordSearchGridSize) {
-                                            setWordSearchWords([...wordSearchWords, newWord.trim()]);
-                                            setNewWord('');
-                                        }
-                                    }
-                                }}
                                 className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none font-mono tracking-wider"
                                 placeholder="NUEVA PALABRA"
                                 maxLength={wordSearchGridSize}
                             />
+                            <input
+                                type="text"
+                                value={newClue}
+                                onChange={(e) => setNewClue(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        if (newWord.trim() && newWord.length <= wordSearchGridSize) {
+                                            setWordSearchWords([...wordSearchWords, { word: newWord.trim(), clue: newClue.trim() }]);
+                                            setNewWord('');
+                                            setNewClue('');
+                                        }
+                                    }
+                                }}
+                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none"
+                                placeholder="Pista / Explicación (Opcional)"
+                            />
                             <button
                                 onClick={() => {
                                     if (newWord.trim() && newWord.length <= wordSearchGridSize) {
-                                        setWordSearchWords([...wordSearchWords, newWord.trim()]);
+                                        setWordSearchWords([...wordSearchWords, { word: newWord.trim(), clue: newClue.trim() }]);
                                         setNewWord('');
+                                        setNewClue('');
                                     }
                                 }}
                                 disabled={!newWord.trim() || newWord.length > wordSearchGridSize}
@@ -469,17 +525,25 @@ export default function CreateGamePage() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                            {wordSearchWords.map((word, i) => (
-                                <div key={i} className="bg-green-900/30 border border-green-500/30 text-green-400 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                                    <span className="font-mono font-bold">{word}</span>
-                                    <button
-                                        onClick={() => setWordSearchWords(wordSearchWords.filter((_, idx) => idx !== i))}
-                                        className="hover:text-white transition-colors"
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                            ))}
+                            {wordSearchWords.map((item, i) => {
+                                const wordText = typeof item.word === 'string' ? item.word : '';
+                                const clueText = typeof item.clue === 'string' ? item.clue : '';
+
+                                return (
+                                    <div key={i} className="bg-green-900/30 border border-green-500/30 text-green-400 px-3 py-1.5 rounded-lg flex items-center gap-2 group relative" title={clueText}>
+                                        <div className="flex flex-col">
+                                            <span className="font-mono font-bold leading-none">{wordText}</span>
+                                            {clueText && <span className="text-[10px] text-green-200/70">{clueText.length > 20 ? clueText.substring(0, 20) + '...' : clueText}</span>}
+                                        </div>
+                                        <button
+                                            onClick={() => setWordSearchWords(wordSearchWords.filter((_, idx) => idx !== i))}
+                                            className="hover:text-white transition-colors"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                )
+                            })}
                             {wordSearchWords.length === 0 && (
                                 <p className="text-gray-500 italic w-full text-center py-4">No hay palabras agregadas aún</p>
                             )}
@@ -493,7 +557,7 @@ export default function CreateGamePage() {
     // MEMORY EDITOR
     if (gameType === 'MEMORY') {
         return (
-            <div className="min-h-screen bg-background p-8">
+            <div className="min-h-screen bg-slate-900 p-8">
                 <div className="max-w-4xl mx-auto space-y-8">
                     {/* Header */}
                     <div className="flex items-center justify-between">
@@ -602,7 +666,7 @@ export default function CreateGamePage() {
     // BATTLESHIP EDITOR
     if (gameType === 'BATTLESHIP') {
         return (
-            <div className="min-h-screen bg-background p-8">
+            <div className="min-h-screen bg-slate-900 p-8">
                 <BattleshipEditor
                     onSave={async (data) => {
                         setSaving(true);
@@ -633,7 +697,7 @@ export default function CreateGamePage() {
 
     // ROSCO EDITOR (Existing UI)
     return (
-        <div className="min-h-screen bg-background p-8">
+        <div className="min-h-screen bg-slate-900 p-8">
             <div className="max-w-6xl mx-auto space-y-8">
                 {/* Header */}
                 <div className="flex items-center justify-between">

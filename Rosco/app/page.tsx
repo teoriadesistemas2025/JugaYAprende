@@ -23,6 +23,25 @@ export default function Home() {
           Unirse a Partida
         </Link>
       </div>
+
+      <div className="mt-8">
+        <Link
+          href="/about"
+          className="text-gray-400 hover:text-white transition underline decoration-dotted underline-offset-4"
+        >
+          Acerca del proyecto
+        </Link>
+      </div>
+
+      <footer className="absolute bottom-6 text-sm text-gray-500 hover:text-gray-400 transition-colors">
+        <a
+          href="https://www.linkedin.com/in/ignacio-lavezzari/?originalSubdomain=ar"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Creado por Ignacio Lavezzari
+        </a>
+      </footer>
     </main>
   );
 }

@@ -21,6 +21,7 @@ const GameSessionSchema = new mongoose.Schema({
         buzzerOpen: { type: Boolean, default: false },
         buzzedPlayer: String,
         buzzTime: Date,
+        answerDeadline: Date, // When current player's time to answer expires
         lastAnswerCorrect: Boolean,
         buzzQueue: [String],
         attemptedPlayers: [String],

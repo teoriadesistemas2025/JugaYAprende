@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import GameSession from '@/models/GameSession';
 import GameConfig from '@/models/GameConfig';
+import { cookies } from 'next/headers';
 
 export async function GET(req: Request, { params }: { params: Promise<{ code: string }> }) {
     try {
@@ -23,9 +24,38 @@ export async function GET(req: Request, { params }: { params: Promise<{ code: st
             finished: p.finished,
         }));
 
+        // Initialize TRIVIA buzzer state if not already set
+        if (config.type === 'TRIVIA' && !game.triviaState?.buzzerEnableTime && game.players.length > 0) {
+            game.triviaState = game.triviaState || {};
+            game.triviaState.currentQuestionIndex = game.triviaState.currentQuestionIndex || 0;
+            game.triviaState.buzzerOpen = false;
+            game.triviaState.buzzedPlayer = null;
+            game.triviaState.buzzQueue = game.triviaState.buzzQueue || [];
+            game.triviaState.attemptedPlayers = game.triviaState.attemptedPlayers || [];
+            // Set buzzer to open in 5 seconds
+            game.triviaState.buzzerEnableTime = new Date(Date.now() + 5000);
+            game.markModified('triviaState');
+            await game.save();
+        }
+
+        // Check if current user is the host
+        const cookieStore = await cookies();
+        const userCookie = cookieStore.get('rosco_user');
+        let isHost = false;
+        if (userCookie) {
+            try {
+                const user = JSON.parse(userCookie.value);
+                isHost = user.id === game.hostId;
+            } catch {
+                isHost = false;
+            }
+        }
+
         return NextResponse.json({
             status: game.status,
             startTime: game.startTime,
+            hostId: game.hostId,
+            isHost,
             config,
             myProgress: playerObj?.progress,
             myScore: playerObj?.score,
@@ -59,6 +89,21 @@ export async function PUT(req: Request, { params }: { params: Promise<{ code: st
 
         if (reviewIndex !== undefined) {
             game.reviewIndex = reviewIndex;
+        }
+
+        // Initialize TRIVIA state when game starts
+        if (status === 'PLAYING' && config.type === 'TRIVIA') {
+            // Initialize buzzer state for first question
+            if (!game.triviaState.buzzerEnableTime) {
+                game.triviaState.currentQuestionIndex = 0;
+                game.triviaState.buzzerOpen = false;
+                game.triviaState.buzzedPlayer = null;
+                game.triviaState.buzzQueue = [];
+                game.triviaState.attemptedPlayers = [];
+                // Set buzzer to open in 5 seconds
+                game.triviaState.buzzerEnableTime = new Date(Date.now() + 5000);
+                game.markModified('triviaState');
+            }
         }
 
         // Handle Score Update

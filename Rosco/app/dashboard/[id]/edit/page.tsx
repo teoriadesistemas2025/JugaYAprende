@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TriviaEditor from '../../components/editors/TriviaEditor';
 import BattleshipEditor from '../../components/editors/BattleshipEditor';
@@ -15,6 +15,7 @@ interface Question {
     answer: string;
     startsWith: boolean;
     justification?: string;
+    disabled?: boolean;
 }
 
 export default function EditGamePage() {
@@ -29,6 +30,14 @@ export default function EditGamePage() {
     const [roscoQuestions, setRoscoQuestions] = useState<Question[]>([]);
     const [selectedLetter, setSelectedLetter] = useState('A');
 
+    // Hangman specific state
+    const [localHints, setLocalHints] = useState<string[]>([]);
+    const [newHint, setNewHint] = useState('');
+
+    // Word Search specific state
+    const [newWord, setNewWord] = useState('');
+    const [newClue, setNewClue] = useState('');
+
     const id = params.id as string;
 
     useEffect(() => {
@@ -39,9 +48,10 @@ export default function EditGamePage() {
                     const data = await res.json();
                     setGame(data);
 
-                    // Initialize Rosco state if applicable
+                    // Initialize specific game states
                     if (data.type === 'ROSCO' || !data.type) {
                         setRoscoTitle(data.title);
+                        // ... (rosco initialization)
                         const mergedQuestions = ALPHABET.map(letter => {
                             const existing = data.questions.find((q: Question) => q.letter === letter);
                             return existing || {
@@ -53,6 +63,9 @@ export default function EditGamePage() {
                             };
                         });
                         setRoscoQuestions(mergedQuestions);
+                    } else if (data.type === 'HANGMAN') {
+                        const hints = data.questions.hints || (data.questions.hint ? [data.questions.hint] : []);
+                        setLocalHints(hints);
                     }
                 } else {
                     router.push('/dashboard');
@@ -65,6 +78,16 @@ export default function EditGamePage() {
         };
         fetchGame();
     }, [id, router]);
+
+    // Sync local hints to game state when changed (Effect lifted but needs guard)
+    useEffect(() => {
+        if (game?.type === 'HANGMAN') {
+            setGame((prev: any) => ({
+                ...prev,
+                questions: { ...prev.questions, hints: localHints }
+            }));
+        }
+    }, [localHints]);
 
     const handleRoscoSave = async () => {
         if (!roscoTitle.trim()) return;
@@ -112,7 +135,7 @@ export default function EditGamePage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="min-h-screen flex items-center justify-center bg-slate-900">
                 <Loader2 className="w-10 h-10 text-blue-500 animate-spin" />
             </div>
         );
@@ -120,7 +143,7 @@ export default function EditGamePage() {
 
     if (game?.type === 'TRIVIA' || game?.type === 'KAHOOT') {
         return (
-            <div className="min-h-screen bg-background p-8">
+            <div className="min-h-screen bg-slate-900 p-8">
                 <TriviaEditor
                     initialData={{
                         title: game.title,
@@ -136,7 +159,7 @@ export default function EditGamePage() {
 
     if (game?.type === 'BATTLESHIP') {
         return (
-            <div className="min-h-screen bg-background p-8">
+            <div className="min-h-screen bg-slate-900 p-8">
                 <BattleshipEditor
                     initialData={{
                         title: game.title,
@@ -146,7 +169,7 @@ export default function EditGamePage() {
                     onSave={async (data) => {
                         await handleGenericSave({
                             title: data.title,
-                            questions: { ships: data.ships, pool: data.pool }
+                            questions: { ships: data.ships, pool: data.pool, timeLimit: data.timeLimit }
                         });
                     }}
                     onCancel={() => router.back()}
@@ -157,21 +180,11 @@ export default function EditGamePage() {
     }
 
     if (game?.type === 'HANGMAN') {
-        // Initialize hints if not present (migration)
-        const hints = game.questions.hints || (game.questions.hint ? [game.questions.hint] : []);
-        const [localHints, setLocalHints] = useState<string[]>(hints);
-        const [newHint, setNewHint] = useState('');
+        // Hooks moved to top level
 
-        // Sync local hints to game state when changed
-        useEffect(() => {
-            setGame((prev: any) => ({
-                ...prev,
-                questions: { ...prev.questions, hints: localHints }
-            }));
-        }, [localHints]);
 
         return (
-            <div className="min-h-screen bg-background p-8">
+            <div className="min-h-screen bg-slate-900 p-8">
                 <div className="max-w-4xl mx-auto space-y-8">
                     <div className="flex items-center justify-between">
                         <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
@@ -179,7 +192,14 @@ export default function EditGamePage() {
                         </button>
                         <h1 className="text-3xl font-bold text-white">Editar Ahorcado</h1>
                         <button
-                            onClick={() => handleGenericSave({ title: game.title, questions: { ...game.questions, hints: localHints } })}
+                            onClick={() => handleGenericSave({
+                                title: game.title,
+                                questions: {
+                                    ...game.questions,
+                                    hints: localHints,
+                                    timeLimit: Number(game.questions.timeLimit) || 300
+                                }
+                            })}
                             disabled={saving || !game.title.trim() || !game.questions.word.trim()}
                             className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 rounded-lg font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
                         >
@@ -205,9 +225,13 @@ export default function EditGamePage() {
                             type="number"
                             min="30"
                             max="600"
-                            value={game.questions.timeLimit || 300}
-                            onChange={(e) => setGame({ ...game, questions: { ...game.questions, timeLimit: parseInt(e.target.value) } })}
+                            value={game.questions.timeLimit ?? ''}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setGame({ ...game, questions: { ...game.questions, timeLimit: val === '' ? '' : parseInt(val) } });
+                            }}
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                            placeholder="300"
                         />
                         <p className="text-xs text-gray-500 mt-2">Tiempo para adivinar la palabra.</p>
                     </div>
@@ -280,10 +304,10 @@ export default function EditGamePage() {
     }
 
     if (game?.type === 'WORD_SEARCH') {
-        const [newWord, setNewWord] = useState('');
+
 
         return (
-            <div className="min-h-screen bg-background p-8">
+            <div className="min-h-screen bg-slate-900 p-8">
                 <div className="max-w-4xl mx-auto space-y-8">
                     <div className="flex items-center justify-between">
                         <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
@@ -346,31 +370,40 @@ export default function EditGamePage() {
                     <div className="bg-card border border-white/10 rounded-xl p-6">
                         <label className="block text-sm font-medium text-gray-400 mb-4">Palabras a Encontrar</label>
 
-                        <div className="flex gap-2 mb-6">
+                        <div className="flex flex-col md:flex-row gap-2 mb-6">
                             <input
                                 type="text"
                                 value={newWord}
                                 onChange={(e) => setNewWord(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none font-mono tracking-wider"
+                                placeholder="NUEVA PALABRA"
+                                maxLength={game.questions.gridSize || 15}
+                            />
+                            <input
+                                type="text"
+                                value={newClue}
+                                onChange={(e) => setNewClue(e.target.value)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                         e.preventDefault();
                                         const words = game.questions.words || [];
                                         if (newWord.trim() && newWord.length <= (game.questions.gridSize || 15)) {
-                                            setGame({ ...game, questions: { ...game.questions, words: [...words, newWord.trim()] } });
+                                            setGame({ ...game, questions: { ...game.questions, words: [...words, { word: newWord.trim(), clue: newClue.trim() }] } });
                                             setNewWord('');
+                                            setNewClue('');
                                         }
                                     }
                                 }}
-                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none font-mono tracking-wider"
-                                placeholder="NUEVA PALABRA"
-                                maxLength={game.questions.gridSize || 15}
+                                className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none"
+                                placeholder="Pista / Explicación (Opcional)"
                             />
                             <button
                                 onClick={() => {
                                     const words = game.questions.words || [];
                                     if (newWord.trim() && newWord.length <= (game.questions.gridSize || 15)) {
-                                        setGame({ ...game, questions: { ...game.questions, words: [...words, newWord.trim()] } });
+                                        setGame({ ...game, questions: { ...game.questions, words: [...words, { word: newWord.trim(), clue: newClue.trim() }] } });
                                         setNewWord('');
+                                        setNewClue('');
                                     }
                                 }}
                                 disabled={!newWord.trim() || newWord.length > (game.questions.gridSize || 15)}
@@ -381,20 +414,35 @@ export default function EditGamePage() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                            {(game.questions.words || []).map((word: string, i: number) => (
-                                <div key={i} className="bg-green-900/30 border border-green-500/30 text-green-400 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                                    <span className="font-mono font-bold">{word}</span>
-                                    <button
-                                        onClick={() => {
-                                            const words = game.questions.words || [];
-                                            setGame({ ...game, questions: { ...game.questions, words: words.filter((_: any, idx: number) => idx !== i) } });
-                                        }}
-                                        className="hover:text-white transition-colors"
-                                    >
-                                        ×
-                                    </button>
-                                </div>
-                            ))}
+                            {(game.questions.words || []).map((wordItem: any, i: number) => {
+                                let wordText = '';
+                                let wordClue = '';
+
+                                if (typeof wordItem === 'string') {
+                                    wordText = wordItem;
+                                } else if (wordItem && typeof wordItem === 'object') {
+                                    wordText = typeof wordItem.word === 'string' ? wordItem.word : '';
+                                    wordClue = typeof wordItem.clue === 'string' ? wordItem.clue : '';
+                                }
+
+                                return (
+                                    <div key={i} className="bg-green-900/30 border border-green-500/30 text-green-400 px-3 py-1.5 rounded-lg flex items-center gap-2 group relative" title={wordClue}>
+                                        <div className="flex flex-col">
+                                            <span className="font-mono font-bold leading-none">{wordText}</span>
+                                            {wordClue && <span className="text-[10px] text-green-200/70">{wordClue.length > 20 ? wordClue.substring(0, 20) + '...' : wordClue}</span>}
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                const words = game.questions.words || [];
+                                                setGame({ ...game, questions: { ...game.questions, words: words.filter((_: any, idx: number) => idx !== i) } });
+                                            }}
+                                            className="hover:text-white transition-colors"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                )
+                            })}
                             {(!game.questions.words || game.questions.words.length === 0) && (
                                 <p className="text-gray-500 italic w-full text-center py-4">No hay palabras agregadas aún</p>
                             )}
@@ -409,7 +457,7 @@ export default function EditGamePage() {
     const currentQuestion = roscoQuestions.find(q => q.letter === selectedLetter);
 
     return (
-        <div className="min-h-screen bg-background p-8">
+        <div className="min-h-screen bg-slate-900 p-8">
             <div className="max-w-6xl mx-auto space-y-8">
                 {/* Header */}
                 <div className="flex items-center justify-between">
@@ -430,16 +478,33 @@ export default function EditGamePage() {
                     </button>
                 </div>
 
-                {/* Title Input */}
-                <div className="bg-card border border-white/10 rounded-xl p-6">
-                    <label className="block text-sm font-medium text-gray-400 mb-2">Título del Rosco</label>
-                    <input
-                        type="text"
-                        value={roscoTitle}
-                        onChange={(e) => setRoscoTitle(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                        placeholder="Ej: Rosco de Geografía"
-                    />
+                {/* Title and Time Limit */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="md:col-span-2 bg-card border border-white/10 rounded-xl p-6">
+                        <label className="block text-sm font-medium text-gray-400 mb-2">Título del Rosco</label>
+                        <input
+                            type="text"
+                            value={roscoTitle}
+                            onChange={(e) => setRoscoTitle(e.target.value)}
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Ej: Rosco de Geografía"
+                        />
+                    </div>
+                    <div className="bg-card border border-white/10 rounded-xl p-6">
+                        <label className="block text-sm font-medium text-gray-400 mb-2">Tiempo Límite (segundos)</label>
+                        <input
+                            type="number"
+                            min="60"
+                            max="600"
+                            value={game?.questions?.timeLimit || 180}
+                            onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                setGame({ ...game, questions: { ...game.questions, timeLimit: isNaN(val) ? 0 : val } });
+                            }}
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <p className="text-xs text-gray-500 mt-2">Tiempo total para completar el rosco.</p>
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -450,20 +515,24 @@ export default function EditGamePage() {
                             {ALPHABET.map(letter => {
                                 const q = roscoQuestions.find(qu => qu.letter === letter);
                                 const isComplete = q?.question && q?.answer;
+                                const isDisabled = q?.disabled;
                                 return (
                                     <button
                                         key={letter}
                                         onClick={() => setSelectedLetter(letter)}
                                         className={cn(
-                                            "w-10 h-10 rounded-lg font-bold transition-all",
+                                            "w-10 h-10 rounded-lg font-bold transition-all relative",
                                             selectedLetter === letter
                                                 ? "bg-blue-600 text-white ring-2 ring-blue-400"
-                                                : isComplete
-                                                    ? "bg-green-900/40 text-green-400 border border-green-500/30"
-                                                    : "bg-white/5 text-gray-400 hover:bg-white/10"
+                                                : isDisabled
+                                                    ? "bg-white/5 text-gray-600 border border-white/5"
+                                                    : isComplete
+                                                        ? "bg-green-900/40 text-green-400 border border-green-500/30"
+                                                        : "bg-white/5 text-gray-400 hover:bg-white/10"
                                         )}
                                     >
                                         {letter}
+                                        {isDisabled && <span className="absolute inset-0 flex items-center justify-center text-red-500/50 text-xl font-bold rounded-lg overflow-hidden">X</span>}
                                     </button>
                                 );
                             })}
@@ -472,64 +541,99 @@ export default function EditGamePage() {
 
                     {/* Question Editor */}
                     <div className="lg:col-span-2 bg-card border border-white/10 rounded-xl p-6 space-y-6">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                            <h2 className="text-2xl font-bold text-white">Letra {selectedLetter}</h2>
-                            <div className="flex bg-white/5 rounded-lg p-1">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/10 pb-4 gap-4">
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                Letra {selectedLetter}
+                                {currentQuestion?.disabled && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded border border-red-500/20">DESACTIVADA</span>}
+                            </h2>
+                            <div className="flex gap-2">
+                                {/* Disable Toggle */}
                                 <button
-                                    onClick={() => handleRoscoQuestionChange('startsWith', true)}
+                                    onClick={() => handleRoscoQuestionChange('disabled', !currentQuestion?.disabled)}
                                     className={cn(
-                                        "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
-                                        currentQuestion?.startsWith ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
+                                        "px-4 py-1.5 rounded-md text-sm font-medium transition-all border",
+                                        currentQuestion?.disabled
+                                            ? "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"
+                                            : "bg-white/5 text-gray-400 border-white/10 hover:text-white"
                                     )}
                                 >
-                                    Empieza con
+                                    {currentQuestion?.disabled ? 'Habilitar Letra' : 'Desactivar Letra'}
                                 </button>
-                                <button
-                                    onClick={() => handleRoscoQuestionChange('startsWith', false)}
-                                    className={cn(
-                                        "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
-                                        !currentQuestion?.startsWith ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
-                                    )}
-                                >
-                                    Contiene
-                                </button>
+
+                                <div className="flex bg-white/5 rounded-lg p-1">
+                                    <button
+                                        onClick={() => handleRoscoQuestionChange('startsWith', true)}
+                                        disabled={currentQuestion?.disabled}
+                                        className={cn(
+                                            "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+                                            currentQuestion?.startsWith ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white",
+                                            currentQuestion?.disabled && "opacity-50 cursor-not-allowed"
+                                        )}
+                                    >
+                                        Empieza
+                                    </button>
+                                    <button
+                                        onClick={() => handleRoscoQuestionChange('startsWith', false)}
+                                        disabled={currentQuestion?.disabled}
+                                        className={cn(
+                                            "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+                                            !currentQuestion?.startsWith ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white",
+                                            currentQuestion?.disabled && "opacity-50 cursor-not-allowed"
+                                        )}
+                                    >
+                                        Contiene
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Pregunta / Definición</label>
-                                <textarea
-                                    value={currentQuestion?.question || ''}
-                                    onChange={(e) => handleRoscoQuestionChange('question', e.target.value)}
-                                    className="w-full h-32 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                                    placeholder="Escribe la definición aquí..."
-                                />
+                        {currentQuestion?.disabled ? (
+                            <div className="h-64 flex flex-col items-center justify-center text-center text-gray-500 space-y-4 bg-white/5 rounded-xl border border-dashed border-white/10">
+                                <AlertCircle className="w-12 h-12 opacity-50" />
+                                <p className="max-w-xs">Esta letra está desactivada y no aparecerá en el juego. El rosco saltará automáticamente a la siguiente letra.</p>
+                                <button
+                                    onClick={() => handleRoscoQuestionChange('disabled', false)}
+                                    className="text-blue-400 hover:underline"
+                                >
+                                    Habilitar nuevamente
+                                </button>
                             </div>
+                        ) : (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-2">Pregunta / Definición</label>
+                                    <textarea
+                                        value={currentQuestion?.question || ''}
+                                        onChange={(e) => handleRoscoQuestionChange('question', e.target.value)}
+                                        className="w-full h-32 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                                        placeholder="Escribe la definición aquí..."
+                                    />
+                                </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Respuesta Correcta</label>
-                                <input
-                                    type="text"
-                                    value={currentQuestion?.answer || ''}
-                                    onChange={(e) => handleRoscoQuestionChange('answer', e.target.value)}
-                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="La respuesta exacta"
-                                />
-                            </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-2">Respuesta Correcta</label>
+                                    <input
+                                        type="text"
+                                        value={currentQuestion?.answer || ''}
+                                        onChange={(e) => handleRoscoQuestionChange('answer', e.target.value)}
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="La respuesta exacta"
+                                    />
+                                </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
-                                    Justificación / Curiosidad <span className="text-xs text-gray-500">(Opcional)</span>
-                                </label>
-                                <textarea
-                                    value={currentQuestion?.justification || ''}
-                                    onChange={(e) => handleRoscoQuestionChange('justification', e.target.value)}
-                                    className="w-full h-20 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                                    placeholder="Explicación adicional que se mostrará al finalizar el juego..."
-                                />
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                                        Justificación / Curiosidad <span className="text-xs text-gray-500">(Opcional)</span>
+                                    </label>
+                                    <textarea
+                                        value={currentQuestion?.justification || ''}
+                                        onChange={(e) => handleRoscoQuestionChange('justification', e.target.value)}
+                                        className="w-full h-20 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                                        placeholder="Explicación adicional que se mostrará al finalizar el juego..."
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>

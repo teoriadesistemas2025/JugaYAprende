@@ -147,7 +147,7 @@ export default function GamePage() {
     }
 
     if (type === 'HANGMAN') {
-        return <HangmanGame data={gameData} player={player!} code={code} onFinish={handleFinish} />;
+        return <HangmanGame data={gameData} player={player!} code={code} onFinish={handleFinish} onScoreUpdate={handleScoreUpdate} />;
     }
 
     if (type === 'WORD_SEARCH') {

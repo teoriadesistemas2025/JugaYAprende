@@ -35,7 +35,7 @@ export default function BattleshipEditor({ initialData, onSave, onCancel, saving
     const [ships, setShips] = useState<Ship[]>(initialData?.ships || []);
     const [questions, setQuestions] = useState<Question[]>(initialData?.pool || []);
 
-    const [timeLimit, setTimeLimit] = useState(initialData?.timeLimit || 300); // Default 5 mins
+    const [timeLimit, setTimeLimit] = useState<number | string>(initialData?.timeLimit || 300); // Default 5 mins
 
     // Ship Placement State
     const [selectedShipSize, setSelectedShipSize] = useState(5);
@@ -51,7 +51,7 @@ export default function BattleshipEditor({ initialData, onSave, onCancel, saving
 
     const handleSave = () => {
         if (!title.trim() || ships.length < 1 || questions.length < 1) return;
-        onSave({ title, ships, pool: questions, timeLimit });
+        onSave({ title, ships, pool: questions, timeLimit: Number(timeLimit) || 300 });
     };
 
     const addQuestion = () => {
@@ -155,11 +155,14 @@ export default function BattleshipEditor({ initialData, onSave, onCancel, saving
                             min="60"
                             step="30"
                             value={timeLimit}
-                            onChange={(e) => setTimeLimit(parseInt(e.target.value) || 300)}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setTimeLimit(val === '' ? '' : parseInt(val));
+                            }}
                             className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-cyan-500 outline-none"
                         />
                         <span className="text-gray-400 text-sm whitespace-nowrap">
-                            ({Math.floor(timeLimit / 60)} min {timeLimit % 60} s)
+                            ({Math.floor((Number(timeLimit) || 0) / 60)} min {(Number(timeLimit) || 0) % 60} s)
                         </span>
                     </div>
                 </div>
