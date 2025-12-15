@@ -1,0 +1,28 @@
+﻿.next/types/validator.ts(144,31): error TS2344: Type 'typeof import("C:/Users/nacho/Desktop/Rosco/app/api/games/[code]/answer/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/games/[code]/answer">'.
+  Types of property 'POST' are incompatible.
+    Type '(req: Request, { params }: { params: { code: string; }; }) => Promise<NextResponse<{ message: string; }> | NextResponse<{ correct: boolean; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ code: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ code: string; }>; }' is not assignable to type '{ params: { code: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'code' is missing in type 'Promise<{ code: string; }>' but required in type '{ code: string; }'.
+.next/types/validator.ts(153,31): error TS2344: Type 'typeof import("C:/Users/nacho/Desktop/Rosco/app/api/games/[code]/host/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/games/[code]/host">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: Request, { params }: { params: { code: string; }; }) => Promise<NextResponse<{ message: string; }> | NextResponse<{ status: any; players: any; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ code: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ code: string; }>; }' is not assignable to type '{ params: { code: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'code' is missing in type 'Promise<{ code: string; }>' but required in type '{ code: string; }'.
+.next/types/validator.ts(162,31): error TS2344: Type 'typeof import("C:/Users/nacho/Desktop/Rosco/app/api/games/[code]/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/games/[code]">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: Request, { params }: { params: { code: string; }; }) => Promise<NextResponse<{ message: string; }> | NextResponse<{ status: any; startTime: any; config: any; myProgress: any; myScore: any; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ code: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ code: string; }>; }' is not assignable to type '{ params: { code: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'code' is missing in type 'Promise<{ code: string; }>' but required in type '{ code: string; }'.
+.next/types/validator.ts(171,31): error TS2344: Type 'typeof import("C:/Users/nacho/Desktop/Rosco/app/api/games/[code]/start/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/games/[code]/start">'.
+  Types of property 'POST' are incompatible.
+    Type '(req: Request, { params }: { params: { code: string; }; }) => Promise<NextResponse<{ message: string; }> | NextResponse<{ success: boolean; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ code: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ code: string; }>; }' is not assignable to type '{ params: { code: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'code' is missing in type 'Promise<{ code: string; }>' but required in type '{ code: string; }'.
