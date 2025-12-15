@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import BattleshipEditor from '../components/editors/BattleshipEditor';
 import TriviaEditor from '../components/editors/TriviaEditor';
@@ -15,6 +15,7 @@ interface Question {
     answer: string;
     startsWith: boolean;
     justification?: string;
+    disabled?: boolean;
 }
 
 export default function CreateGamePage() {
@@ -738,20 +739,24 @@ export default function CreateGamePage() {
                             {ALPHABET.map(letter => {
                                 const q = questions.find(qu => qu.letter === letter);
                                 const isComplete = q?.question && q?.answer;
+                                const isDisabled = q?.disabled;
                                 return (
                                     <button
                                         key={letter}
                                         onClick={() => setSelectedLetter(letter)}
                                         className={cn(
-                                            "w-10 h-10 rounded-lg font-bold transition-all",
+                                            "w-10 h-10 rounded-lg font-bold transition-all relative",
                                             selectedLetter === letter
                                                 ? "bg-blue-600 text-white ring-2 ring-blue-400"
-                                                : isComplete
-                                                    ? "bg-green-900/40 text-green-400 border border-green-500/30"
-                                                    : "bg-white/5 text-gray-400 hover:bg-white/10"
+                                                : isDisabled
+                                                    ? "bg-white/5 text-gray-600 border border-white/5"
+                                                    : isComplete
+                                                        ? "bg-green-900/40 text-green-400 border border-green-500/30"
+                                                        : "bg-white/5 text-gray-400 hover:bg-white/10"
                                         )}
                                     >
                                         {letter}
+                                        {isDisabled && <span className="absolute inset-0 flex items-center justify-center text-red-500/50 text-xl font-bold rounded-lg overflow-hidden">X</span>}
                                     </button>
                                 );
                             })}
@@ -760,64 +765,99 @@ export default function CreateGamePage() {
 
                     {/* Question Editor */}
                     <div className="lg:col-span-2 bg-card border border-white/10 rounded-xl p-6 space-y-6">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                            <h2 className="text-2xl font-bold text-white">Letra {selectedLetter}</h2>
-                            <div className="flex bg-white/5 rounded-lg p-1">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-white/10 pb-4 gap-4">
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                                Letra {selectedLetter}
+                                {currentQuestion?.disabled && <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded border border-red-500/20">DESACTIVADA</span>}
+                            </h2>
+                            <div className="flex gap-2">
+                                {/* Disable Toggle */}
                                 <button
-                                    onClick={() => handleQuestionChange('startsWith', true)}
+                                    onClick={() => handleQuestionChange('disabled', !currentQuestion?.disabled)}
                                     className={cn(
-                                        "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
-                                        currentQuestion?.startsWith ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
+                                        "px-4 py-1.5 rounded-md text-sm font-medium transition-all border",
+                                        currentQuestion?.disabled
+                                            ? "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"
+                                            : "bg-white/5 text-gray-400 border-white/10 hover:text-white"
                                     )}
                                 >
-                                    Empieza con
+                                    {currentQuestion?.disabled ? 'Habilitar Letra' : 'Desactivar Letra'}
                                 </button>
-                                <button
-                                    onClick={() => handleQuestionChange('startsWith', false)}
-                                    className={cn(
-                                        "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
-                                        !currentQuestion?.startsWith ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"
-                                    )}
-                                >
-                                    Contiene
-                                </button>
+
+                                <div className="flex bg-white/5 rounded-lg p-1">
+                                    <button
+                                        onClick={() => handleQuestionChange('startsWith', true)}
+                                        disabled={currentQuestion?.disabled}
+                                        className={cn(
+                                            "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+                                            currentQuestion?.startsWith ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white",
+                                            currentQuestion?.disabled && "opacity-50 cursor-not-allowed"
+                                        )}
+                                    >
+                                        Empieza
+                                    </button>
+                                    <button
+                                        onClick={() => handleQuestionChange('startsWith', false)}
+                                        disabled={currentQuestion?.disabled}
+                                        className={cn(
+                                            "px-4 py-1.5 rounded-md text-sm font-medium transition-all",
+                                            !currentQuestion?.startsWith ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white",
+                                            currentQuestion?.disabled && "opacity-50 cursor-not-allowed"
+                                        )}
+                                    >
+                                        Contiene
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Pregunta / Definición</label>
-                                <textarea
-                                    value={currentQuestion?.question || ''}
-                                    onChange={(e) => handleQuestionChange('question', e.target.value)}
-                                    className="w-full h-32 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                                    placeholder="Escribe la definición aquí..."
-                                />
+                        {currentQuestion?.disabled ? (
+                            <div className="h-64 flex flex-col items-center justify-center text-center text-gray-500 space-y-4 bg-white/5 rounded-xl border border-dashed border-white/10">
+                                <AlertCircle className="w-12 h-12 opacity-50" />
+                                <p className="max-w-xs">Esta letra está desactivada y no aparecerá en el juego. El rosco saltará automáticamente a la siguiente letra.</p>
+                                <button
+                                    onClick={() => handleQuestionChange('disabled', false)}
+                                    className="text-blue-400 hover:underline"
+                                >
+                                    Habilitar nuevamente
+                                </button>
                             </div>
+                        ) : (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-2">Pregunta / Definición</label>
+                                    <textarea
+                                        value={currentQuestion?.question || ''}
+                                        onChange={(e) => handleQuestionChange('question', e.target.value)}
+                                        className="w-full h-32 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                                        placeholder="Escribe la definición aquí..."
+                                    />
+                                </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">Respuesta Correcta</label>
-                                <input
-                                    type="text"
-                                    value={currentQuestion?.answer || ''}
-                                    onChange={(e) => handleQuestionChange('answer', e.target.value)}
-                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                    placeholder="La respuesta exacta"
-                                />
-                            </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-2">Respuesta Correcta</label>
+                                    <input
+                                        type="text"
+                                        value={currentQuestion?.answer || ''}
+                                        onChange={(e) => handleQuestionChange('answer', e.target.value)}
+                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="La respuesta exacta"
+                                    />
+                                </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
-                                    Justificación / Curiosidad <span className="text-xs text-gray-500">(Opcional)</span>
-                                </label>
-                                <textarea
-                                    value={currentQuestion?.justification || ''}
-                                    onChange={(e) => handleQuestionChange('justification', e.target.value)}
-                                    className="w-full h-20 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                                    placeholder="Explicación adicional que se mostrará al finalizar el juego..."
-                                />
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                                        Justificación / Curiosidad <span className="text-xs text-gray-500">(Opcional)</span>
+                                    </label>
+                                    <textarea
+                                        value={currentQuestion?.justification || ''}
+                                        onChange={(e) => handleQuestionChange('justification', e.target.value)}
+                                        className="w-full h-20 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                                        placeholder="Explicación adicional que se mostrará al finalizar el juego..."
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
             </div>
